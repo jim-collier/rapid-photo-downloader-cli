@@ -5,12 +5,10 @@
 <!-- markdownlint-disable MD041 -- First line in a file should be a top-level heading -->
 <div align="center">
 
-[![!#/bin/bash](https://img.shields.io/badge/-%23!%2Fbin%2Fbash-1f425f.svg?logo=gnu-bash)](https://www.gnu.org/software/bash/)
+![Go](https://img.shields.io/badge/Go-00ADD8?logo=go&logoColor=white)
 ![License: GPL v2](https://img.shields.io/badge/License-GPLv2-blue.svg)
-![Lifecycle](https://img.shields.io/badge/Lifecycle-RC-blue)
+![Lifecycle: Alpha](https://img.shields.io/badge/Lifecycle-Alpha-orange)
 ![Support](https://img.shields.io/badge/Support-Maintained-brightgreen)
-![Coverage](https://img.shields.io/badge/Coverage-75%25-yellow)
-![Status: Passing](https://img.shields.io/badge/Status-Passing-brightgreen)
 
 </div>
 <!--
@@ -42,8 +40,11 @@
 -->
 
 <!-- TOC ignore:true -->
-# TEMPLATE
+# Rapid Photo Downloader CLI
 
+All of the direct actions that Rapid Photo Downloader Pro can take on files, but in a CLI. (Rename and copy or move photos, videos, music files, and/or regular files.)
+
+<!--
 <table style="border: none; border-collapse: collapse;">
 	<tr style="border: none; border-collapse: collapse;">
 		<td style="border: none; border-collapse: collapse;"><img src="assets/logo.png" alt="Silky" width="320"/></td>
@@ -52,8 +53,7 @@
 </table>
 
 <p align="center"><img src="assets/logo.png" alt="" width="128"></p>
-
-This is a thing.
+-->
 
 <!-- TOC ignore:true -->
 ## Table of contents
@@ -70,6 +70,8 @@ This is a thing.
 
 ## Why
 
+It's very powerful, without all the GUI stuff, just focusing on files and names.
+
 ## Features
 
 ## Installing
@@ -78,7 +80,7 @@ This is a thing.
 
 ## Copyright and license
 
-> Copyright © 2025-26 Jim Collier (ID: 1cv◂‡Vᛦ)<br />
+> Copyright © 2026 Jim Collier (ID: 1cv◂‡Vᛦ)<br />
 > Licensed under [GNU GPL v2 Or Later License](https://spdx.org/licenses/GPL-2.0-or-later.html) license. No warranty.
 <!--
 > Licensed under the [MIT License](https://mit-license.org/). No warranty.
