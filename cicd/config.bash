@@ -32,6 +32,14 @@ GO_LDFLAGS="-s -w"
 GO_BUILD_FLAGS=(-trimpath -ldflags "${GO_LDFLAGS}")
 export CGO_ENABLED=0
 
+## Parallelism cap: no stage may saturate the box - hold every stage to <=50% of
+## cores. Go defaults build -p, test -p/-parallel, and race+bench runtime threads
+## all to GOMAXPROCS, so setting it once here caps them together. Exported, so the
+## child scripts (test.bash, profile-workload.bash) inherit this exact value.
+CICD_CPU_PERCENT="${CICD_CPU_PERCENT:-50}"
+GOMAXPROCS=$(( "$(nproc 2>/dev/null || echo 2)" * CICD_CPU_PERCENT / 100 )); (( GOMAXPROCS < 1 )) && GOMAXPROCS=1
+export GOMAXPROCS
+
 ## Stage 1: format the source in place before anything is compiled or tested.
 ## Go only - never reformat bash (owner rule). Empty () to disable.
 FMT_CMD=(gofmt -w .)
