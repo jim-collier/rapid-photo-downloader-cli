@@ -32,6 +32,10 @@ root="$(cd "${here}/.." && pwd)"
 export PATH="${HOME}/.go/bin:${HOME}/.local/bin:${HOME}/go/bin:${PATH}"
 cd "${root}"
 
+## Hold go test / race / vet to <=50% of cores when run standalone; honour cicd.bash's
+## exported GOMAXPROCS when called from the pipeline (see config.bash).
+: "${GOMAXPROCS:=$(( "$(nproc 2>/dev/null || echo 2)" / 2 ))}"; (( GOMAXPROCS < 1 )) && GOMAXPROCS=1; export GOMAXPROCS
+
 quick="${CICD_QUICK:-0}"
 fuzztime="${CICD_FUZZTIME:-10s}"   # per fuzz target; short by default
 

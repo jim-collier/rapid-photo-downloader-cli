@@ -33,6 +33,10 @@ root="$(cd "${here}/../.." && pwd)"
 export PATH="${HOME}/.go/bin:${HOME}/.local/bin:${HOME}/go/bin:${HOME}/.cargo/bin:${PATH}"
 cd "${root}"
 
+## Hold the bench run to <=50% of cores when run standalone; honour cicd.bash's
+## exported GOMAXPROCS when called from the pipeline (see config.bash).
+: "${GOMAXPROCS:=$(( "$(nproc 2>/dev/null || echo 2)" / 2 ))}"; (( GOMAXPROCS < 1 )) && GOMAXPROCS=1; export GOMAXPROCS
+
 benchPkg="${BENCH_PKG:-./...}"
 benchPat="${BENCH_PAT:-.}"
 have(){ command -v "$1" >/dev/null 2>&1; }
