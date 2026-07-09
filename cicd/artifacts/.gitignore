@@ -1,0 +1,4 @@
+## Transient CI/CD artifacts (run logs, flamegraphs, seen-markers). Keep the
+## dirs, ignore the contents.
+*
+!.gitignore

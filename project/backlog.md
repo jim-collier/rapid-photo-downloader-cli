@@ -40,7 +40,8 @@ In each section, items are listed approximately from newest to oldest.
 
 ## Initial requirements
 
-- 🔘 A CI/CD pipeline kicked off by a bash script (`cicd/cicd.bash`): builds, tests, and can commit and push. Packaging and publishing are opt-in.
+- 🛠️ A CI/CD pipeline kicked off by a bash script (`cicd/cicd.bash`): builds, tests, and can commit and push. Packaging and publishing are opt-in.
+	- Scaffolded 2026-07-09: 7-stage fail-fast pipeline (format/build/test/profile/release/dogfood/publish) with `-q`, `-m`, `--quick`, `--no-*`. Build/test/profile stages skip until Go code exists; backup+publish works now. Includes fuzz/security tests and a flamegraph profiler+report. Marked partial until real code exercises the build/test/profile paths.
 
 - 🔘 Dev-environment install script (Linux bash, macOS sh, Windows PowerShell), runnable via a single `curl`/`wget` and documented under "how to develop". Clones main, installs dependencies, and states what it will do with an option to abort.
 
