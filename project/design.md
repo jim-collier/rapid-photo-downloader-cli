@@ -59,7 +59,9 @@ For the include/exclude flags, use the isolated engine already build and debugge
 		- `--[i][whole]name-inc[lude]="*glob*"`    : Select files to keep by filename or whole filepath, with simple wildcards. Wildcards *must be inside the quotes.*
 		- `--[i][whole]name-exc[lude]="*glob*"`    : Select files to remove by filename or whole filepath.
 		- `--[i][whole]name-re-inc[lude]="*glob*"` : Select files to re-add by filename or whole filepath.
+	- When the final file list is compiled, sort it dedup it.
 - `--files-from[=]"file"`: take the file list from a file instead of `<source/>`. Mutually exclusive with `<source/>` and inc/exc flags.
+	- After loading the list, sort it dedup it.
 
 ##### Duplicates detection and transfer
 
@@ -114,13 +116,13 @@ Also generically useful:
 
 ### Configuration
 
-#### ASHL: "A Simple Hierarchical config Language"
+#### SHCL: "Simple Hierarchical Config Language"
 
 The simplest possible config language that can express any kind of flat or hierarchical data.
 
 CPU cycles are cheap. Brainpower isn't.
 
-ASHL shifts the hard work of using a configuration "language" *away* from:
+SHCL shifts the hard work of using a configuration "language" *away* from:
 
 - The end user.
 - The programmer using the code to read frikkin configuration values.
