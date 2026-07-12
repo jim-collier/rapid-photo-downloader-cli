@@ -9,7 +9,7 @@
 ##	  are optional; the harness already skips a missing one).
 ##	- Syntax: cicd/utility/install-tools.bash [tool ...]
 ##	    no args -> the security suites the harness runs (govulncheck, gosec)
-##	    names   -> any of: govulncheck gosec golangci-lint staticcheck goreleaser
+##	    names   -> any of: govulncheck gosec golangci-lint staticcheck goreleaser nfpm
 ##	  Env: FORCE=1 reinstall even if present.
 
 ##	History: At bottom of script.
@@ -40,6 +40,7 @@ install_one(){ case "$1" in
 	staticcheck)    go_get staticcheck    "honnef.co/go/tools/cmd/staticcheck@${STATICCHECK_VERSION}" ;;
 	golangci-lint)  go_get golangci-lint  "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_LINT_VERSION}" ;;
 	goreleaser)     go_get goreleaser     "github.com/goreleaser/goreleaser/v2@${GORELEASER_VERSION}" ;;
+	nfpm)           go_get nfpm           "github.com/goreleaser/nfpm/v2/cmd/nfpm@${NFPM_VERSION}" ;;
 	*) fEcho "WARNING: unknown tool '$1'"; return 0 ;;
 esac; }
 

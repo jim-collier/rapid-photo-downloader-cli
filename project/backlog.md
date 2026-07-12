@@ -60,6 +60,13 @@ In each section, items are listed approximately from newest to oldest.
 
 ### Features and enhancements
 
+- ✅ Cross-platform build matrix + packaging (full run, not `--quick`)
+	- Done 2026-07-11 (branch `pkg` -> dev). Verified end-to-end against a throwaway module: 8 cross binaries + 4 Linux packages + 2 Windows installers all build.
+	- Matrix: Linux / FreeBSD / Windows / macOS x x86_64 + arm64, pure-Go cross-compiles. No `--include-arm` - cross-builds aren't emulated, so arm64 is as fast as amd64 and there is nothing slow to gate.
+	- Debug (native, unstripped) build drives test + profile; optimized `-s -w -trimpath` build drives packaging + dogfood.
+	- Packages built here now: `.deb` + `.rpm` per Linux arch (nfpm), plus a single self-contained Windows setup `.exe` per arch (NSIS - static binary, adds `rpdc` to PATH, upgrades in place). New `--no-package` flag; `--quick` skips packaging.
+	- Deferred to hosted OS runners / signing (slots + docs wired): macOS `.dmg`, FreeBSD pkg, Linux AppImage + Flatpak, Windows `.msi`. See Future.
+
 - 🛠️ CI/CD improvements
 	- Scaffolded 2026-07-11 (branch `ci` -> dev): all five below written + validated, guarded to stay green until `go.mod` + the version source land - same pattern as the local pipeline. End-to-end verification (green CI on real code, real release artifacts) waits for the module.
 	- ✅ Minimal hosted CI
@@ -96,5 +103,7 @@ In each section, items are listed approximately from newest to oldest.
 #### Done - Features and enhancements
 
 ### Future and/or deferred
+
+- 🔘 Native installer formats that need their own OS or a signing cert - wire each as a hosted-runner step: macOS `.dmg` (Mac + Apple cert), FreeBSD pkg (FreeBSD builder), Linux AppImage + Flatpak, Windows `.msi`. Config/goreleaser slots + docs already in place; those targets ship as binaries/archives meanwhile.
 
 ### Canceled

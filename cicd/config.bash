@@ -41,32 +41,73 @@ GOMAXPROCS=$(( "$(nproc 2>/dev/null || echo 2)" * CICD_CPU_PERCENT / 100 )); (( 
 export GOMAXPROCS
 
 ## Stage 1: format the source in place before anything is compiled or tested.
-## Go only - never reformat bash (owner rule). Empty () to disable.
+## Go only - never reformat bash. Empty () to disable.
 FMT_CMD=(gofmt -w .)
 
-## Stage 2: debug build (fast compile sanity across all packages).
+## Stage 2: debug build - the native, unstripped build. This (and the profiler's
+## bench build) is what testing + profiling run against: symbols kept, no -s -w, so
+## panics and flamegraphs stay legible. The optimized/stripped build is stage 5.
 DEBUG_BUILD_CMD=(go build ./...)
 
 ## Stage 3: test harness (vet, go test, race, fuzz, govulncheck, gosec). Slow
 ## pieces skip under --quick; missing tools skip with a warning (see test.bash).
 TEST_HARNESS=(cicd/test.bash)
 
-## Stage 5: native release build + its artifact (this is what gets dogfooded).
+## Stage 5: native release build + its artifact - the optimized/stripped build.
+## This is what gets dogfooded and packaged (release path), vs the debug build
+## above that testing/profiling use.
 RELEASE_NATIVE_BIN="bin/${EXE_NAME}"
 RELEASE_NATIVE_CMD=(go build "${GO_BUILD_FLAGS[@]}" -o "${RELEASE_NATIVE_BIN}" .)
 
 ## Stage 5: cross-release targets. One per line: "label|artifact|command...".
 ## Pure-Go static builds cross-compile with just GOOS/GOARCH - no zig/SDK needed
-## (macOS included, as long as we stay CGO-free). Set BUILD_CROSS=0 to skip.
+## (macOS + BSD included, as long as we stay CGO-free). Set BUILD_CROSS=0 to skip.
+##
+## Full os/arch matrix off this box: Linux, FreeBSD, Windows, macOS x amd64/arm64.
+## arm64 is NOT a special case here - a cross-compile is codegen only (no emulation),
+## so arm64 costs the same wall-time as amd64 and tests/profiling only ever run the
+## native amd64 build. Hence no --include-arm flag: it would gate nothing worth gating.
 BUILD_CROSS=1
 ## The command is eval'd (see cicd.bash), so ldflags is quoted literally here -
 ## expanding the array would split "-s -w" into two broken args.
 CROSS_TARGETS=(
 	"Linux ARM64|bin/${EXE_NAME}-linux-arm64|GOOS=linux GOARCH=arm64 go build -trimpath -ldflags '${GO_LDFLAGS}' -o bin/${EXE_NAME}-linux-arm64 ."
+	"FreeBSD x86_64|bin/${EXE_NAME}-freebsd-amd64|GOOS=freebsd GOARCH=amd64 go build -trimpath -ldflags '${GO_LDFLAGS}' -o bin/${EXE_NAME}-freebsd-amd64 ."
+	"FreeBSD ARM64|bin/${EXE_NAME}-freebsd-arm64|GOOS=freebsd GOARCH=arm64 go build -trimpath -ldflags '${GO_LDFLAGS}' -o bin/${EXE_NAME}-freebsd-arm64 ."
 	"Windows x86_64|bin/${EXE_NAME}-windows-amd64.exe|GOOS=windows GOARCH=amd64 go build -trimpath -ldflags '${GO_LDFLAGS}' -o bin/${EXE_NAME}-windows-amd64.exe ."
 	"Windows ARM64|bin/${EXE_NAME}-windows-arm64.exe|GOOS=windows GOARCH=arm64 go build -trimpath -ldflags '${GO_LDFLAGS}' -o bin/${EXE_NAME}-windows-arm64.exe ."
-	"macOS ARM64|bin/${EXE_NAME}-darwin-arm64|GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags '${GO_LDFLAGS}' -o bin/${EXE_NAME}-darwin-arm64 ."
 	"macOS x86_64|bin/${EXE_NAME}-darwin-amd64|GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags '${GO_LDFLAGS}' -o bin/${EXE_NAME}-darwin-amd64 ."
+	"macOS ARM64|bin/${EXE_NAME}-darwin-arm64|GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags '${GO_LDFLAGS}' -o bin/${EXE_NAME}-darwin-arm64 ."
+)
+
+## Stage 5: packaging. Runs after the release binaries exist, in the full run only
+## (--quick and --no-package skip it). Each builder is fail-soft: its tool missing
+## -> that format is skipped with a warning, like the rest of the pipeline's soft
+## deps. Guarded on have_go_code and a resolved version, so it stays dark pre-code.
+##
+## Buildable from this Linux box now:
+##   - .deb + .rpm per Linux arch          via nfpm   (go install; auto-installed if absent)
+##   - single self-contained setup .exe    via makensis (NSIS; system pkg: apt install nsis)
+## Deferred (need their own OS / signing, wired as future runner steps - see design.md):
+##   - macOS .dmg  (needs a Mac + Apple signing cert)
+##   - FreeBSD pkg (needs a FreeBSD builder)
+##   - Linux AppImage / Flatpak            (deferred by decision)
+BUILD_PACKAGES=1
+PACKAGE_OUT_DIR="dist"                              # relative to repo root; gitignored, created on demand
+
+## .deb/.rpm: nfpm config + which formats, and the linux binary feeding each arch.
+NFPM_CONFIG="cicd/packaging/nfpm.yaml"
+NFPM_FORMATS=(deb rpm)
+PKG_LINUX_BINS=(                                     # "goarch|binary that arch packages"
+	"amd64|${RELEASE_NATIVE_BIN}"
+	"arm64|bin/${EXE_NAME}-linux-arm64"
+)
+
+## Windows installer: NSIS script + the windows binary feeding each arch.
+NSIS_SCRIPT="cicd/packaging/windows-installer.nsi"
+PKG_WINDOWS_BINS=(                                   # "goarch|windows .exe that arch wraps"
+	"amd64|bin/${EXE_NAME}-windows-amd64.exe"
+	"arm64|bin/${EXE_NAME}-windows-arm64.exe"
 )
 
 ## Stage 4: profiler (non-gating artifact, not a pass/fail test). Runs the CPU

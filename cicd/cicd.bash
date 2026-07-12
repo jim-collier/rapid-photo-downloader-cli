@@ -19,7 +19,7 @@
 ##	   2. debug build (go build ./...)
 ##	   3. test harness (vet, go test, race, fuzz, govulncheck, gosec)
 ##	   4. profiler   (flamegraph SVG; non-gating artifact - see failure policy)
-##	   5. release    (native + cross targets)
+##	   5. release    (native + cross targets, then packages: deb/rpm + win installer)
 ##	   6. dogfood    (install native release locally)
 ##	   7. backup + publish to git (runs from repo root)
 ##	- Syntax:
@@ -29,10 +29,11 @@
 ##	   -q, --quiet         quiet + unattended (implies -y); publish runs quiet too
 ##	   -m, --message MSG   publish hands-off with this commit message (no editor)
 ##	       --msg MSG       alias for --message
-##	   --quick             skip the slow stages (cross-builds, profiling, race+fuzz)
+##	   --quick             skip the slow stages (cross-builds, packaging, profiling, race+fuzz)
 ##	   --no-fmt            skip the formatter stage
 ##	   --no-test           skip the test harness stage
 ##	   --no-cross          skip cross-target release builds
+##	   --no-package        skip building distributable packages (deb/rpm, win installer)
 ##	   --no-profile        skip the profiler stage
 ##	   --no-dogfood        skip installing the native release locally
 ##	   --no-publish        skip the git backup + publish stage
@@ -56,6 +57,7 @@ export PATH="${HOME}/.go/bin:${HOME}/.local/bin:${HOME}/go/bin:${HOME}/.cargo/bi
 source "${here}/config.bash"
 source "${here}/utility/include/gfs-rotate.bash"                  ## gfs_rotate() for the artifacts
 declare -p FMT_CMD &>/dev/null || FMT_CMD=()                      ## tolerate a config without the fmt stage
+: "${BUILD_PACKAGES:=0}"                                          ## tolerate a config without the packaging block
 cd "${root}"
 stamp="$(date +%Y%m%d-%H%M%S)"
 
@@ -67,10 +69,11 @@ while (($#)); do case "$1" in
 	--no-fmt)                 FMT_CMD=(); shift ;;
 	--no-test)                TEST_HARNESS=(); shift ;;
 	--no-cross)               BUILD_CROSS=0; shift ;;
+	--no-package)             BUILD_PACKAGES=0; shift ;;
 	--no-profile)             PROFILE_ENABLE=0; shift ;;
 	--no-dogfood)             DOGFOOD_FIXED_DESTS=(); DOGFOOD_ROTATING_DESTS=(); shift ;;
 	--no-publish)             GIT_PUBLISH=(); shift ;;
-	--quick)                  quick=1; BUILD_CROSS=0; PROFILE_ENABLE=0; shift ;;   ## skip the slow stages
+	--quick)                  quick=1; BUILD_CROSS=0; BUILD_PACKAGES=0; PROFILE_ENABLE=0; shift ;;   ## skip the slow stages
 	--message=*|--msg=*|-m=*) cli_message="${1#*=}"; shift ;;
 	-m|--message|--msg)       cli_message="${2-}"; shift; (($#)) && shift ;;
 	-h|--help)                sed -n '/^##	- Purpose:/,/^##	History:/p' "${BASH_SOURCE[0]}" | sed '$d; s/^##	\{0,1\}//'; exit 0 ;;
@@ -123,6 +126,63 @@ in_use(){
 	done
 	return 1
 }
+
+## Stage 5b: build distributable packages from the release binaries. Fail-soft per
+## builder - a missing tool skips that format with a warning (nfpm is auto-installed
+## at its pinned version when absent; NSIS/makensis is a system pkg). Guarded on go
+## code + a resolved in-source version. Output -> PACKAGE_OUT_DIR (dist/, gitignored).
+run_packaging(){
+	((BUILD_PACKAGES)) || { fEcho_Clean "packaging disabled$( ((quick)) && echo ' (--quick)')"; return 0; }
+	have_go_code       || { fEcho_Clean "packaging skipped (no Go code yet)"; return 0; }
+
+	local ver; ver="$("${here}/utility/version-check.bash" 2>/dev/null || true)"
+	[[ -n "$ver" ]] || { fEcho "WARNING: packaging skipped (no version in internal/version yet)"; return 0; }
+	mkdir -p "${root}/${PACKAGE_OUT_DIR}"
+
+	## Linux .deb + .rpm via nfpm. nfpm.yaml is a template - render the ${PKG_*}
+	## placeholders per arch (nfpm's globber would otherwise choke on the ${...}),
+	## then build each format from the rendered file.
+	if ((${#PKG_LINUX_BINS[@]})) && [[ -n "${NFPM_CONFIG:-}" ]]; then
+		command -v nfpm >/dev/null 2>&1 || { fEcho_Clean "nfpm absent - installing (pinned)"; "${here}/utility/install-tools.bash" nfpm >/dev/null 2>&1 || true; }
+		if command -v nfpm >/dev/null 2>&1; then
+			local entry arch bin fmt out rendered
+			for entry in "${PKG_LINUX_BINS[@]}"; do
+				arch="${entry%%|*}"; bin="${entry#*|}"
+				[[ -f "${root}/${bin}" ]] || { fEcho "WARNING: linux ${arch} binary missing (${bin}) - skip its packages"; continue; }
+				rendered="${PACKAGE_OUT_DIR}/.nfpm-${arch}.yaml"
+				sed -e "s|\${PKG_ARCH}|${arch}|g" -e "s|\${PKG_VERSION}|${ver}|g" -e "s|\${PKG_BIN}|${bin}|g" "${NFPM_CONFIG}" > "${rendered}"
+				for fmt in "${NFPM_FORMATS[@]}"; do
+					out="${PACKAGE_OUT_DIR}/${EXE_NAME}_${ver}_${arch}.${fmt}"
+					if nfpm package -f "${rendered}" -p "$fmt" -t "${out}" >/dev/null 2>&1
+					then fEcho "OK: ${fmt} (${arch}): ${out}"
+					else fEcho "WARNING: nfpm ${fmt} (${arch}) failed - skipping"; fi
+				done
+				rm -f "${rendered}"
+			done
+		else
+			fEcho "WARNING: nfpm unavailable - skipping deb/rpm"
+		fi
+	fi
+
+	## Windows single-file installer .exe via NSIS (self-contained, upgrade-in-place).
+	if ((${#PKG_WINDOWS_BINS[@]})) && [[ -n "${NSIS_SCRIPT:-}" ]]; then
+		if command -v makensis >/dev/null 2>&1; then
+			local wentry warch wbin wout
+			for wentry in "${PKG_WINDOWS_BINS[@]}"; do
+				warch="${wentry%%|*}"; wbin="${wentry#*|}"
+				[[ -f "${root}/${wbin}" ]] || { fEcho "WARNING: windows ${warch} binary missing (${wbin}) - skip its installer"; continue; }
+				wout="${PACKAGE_OUT_DIR}/${EXE_NAME}-${ver}-windows-${warch}-setup.exe"
+				if makensis -V2 -DVERSION="$ver" -DARCH="$warch" -DSRCEXE="${root}/${wbin}" -DOUTFILE="${root}/${wout}" "${NSIS_SCRIPT}" >/dev/null 2>&1
+				then fEcho "OK: windows installer (${warch}): ${wout}"
+				else fEcho "WARNING: NSIS installer (${warch}) failed - skipping"; fi
+			done
+		else
+			fEcho "WARNING: makensis (NSIS) not installed - skipping windows installer (apt install nsis)"
+		fi
+	fi
+	## macOS .dmg + FreeBSD pkg are deferred (need a Mac/Apple cert and a FreeBSD
+	## builder); those targets still ship as archives via goreleaser on release.
+}
 trap 'rc=$?; printf "\n[ CICD ABORTED (exit %s) at line %s: %s ]\n" "$rc" "$LINENO" "$BASH_COMMAND" >&2; exit $rc' ERR
 
 ## Preflight: show the plan with resolved paths.
@@ -151,6 +211,11 @@ if ((BUILD_CROSS)) && ((${#CROSS_TARGETS[@]})); then
 	for t in "${CROSS_TARGETS[@]}"; do fEcho_Clean "    - ${t%%|*}"; done
 else
 	fEcho_Clean "Release (cross) .....: (skipped)"
+fi
+if ((BUILD_PACKAGES)); then
+	fEcho_Clean "Packages ............: deb/rpm (linux) + installer .exe (windows)$(have_go_code || echo '  (skips - no code yet)')"
+else
+	fEcho_Clean "Packages ............: (skipped$( ((quick)) && echo ' - --quick'))"
 fi
 if ((${#DOGFOOD_FIXED_DESTS[@]})); then
 	if [[ -n "$fixed_dest" ]]; then fEcho_Clean "Dogfood, fixed name .: overwrite ${fixed_dest}/${EXE_NAME}"
@@ -281,6 +346,10 @@ else
 		done
 	fi
 fi
+
+## Stage 5b: distributable packages (deb/rpm + windows installer) from the binaries.
+fSection "5/7  Package (deb/rpm + windows installer)"
+run_packaging
 
 ## Stage 6: dogfood. Two independent installs (fixed overwrite + rotating dated copy).
 fSection "6/7  Dogfood (install native release locally)"

@@ -251,9 +251,20 @@ Definition:
 	- We decided source-of-truth-in-code over a manual pre-merge tag, with a guard: the local pipeline warns, and the release workflow fails, if the in-source version wasn't bumped past the latest tag (`cicd/utility/version-check.bash`).
 	- `Commit` and `Date` in the same package are `-ldflags -X` stamped at build/release time; `Version` stays a plain const you edit.
 
-- Release packaging: goreleaser (`.goreleaser.yaml`), wired into the release workflow.
-	- Same targets/flags as `cicd/config.bash` (pure-Go, CGO off, `-s -w -trimpath`): linux/windows/darwin x amd64/arm64.
-	- Adds archives (`rpdc_<version>_<os>_<arch>`, zip on Windows) + a `checksums.txt` - the local pipeline itself only emits raw binaries, so there is no prior archive scheme to preserve.
+- Build matrix: the full run (not `--quick`) builds every os/arch this box can cross-compile - Linux, FreeBSD, Windows, macOS, each x86_64 + arm64. All pure-Go static (CGO off), so a cross-build needs nothing but `GOOS`/`GOARCH`.
+	- No `--include-arm` flag: a cross-compile is codegen only (no emulation), so arm64 costs the same wall-time as amd64, and tests/profiling only ever run the native amd64 build. There is nothing slow to gate.
+
+- Two build kinds, by purpose:
+	- Debug (native, unstripped): what testing and profiling run against - symbols kept, no `-s -w`, so panics and flamegraphs stay legible.
+	- Release (`-s -w -trimpath`): the optimized/stripped build - what gets dogfooded and packaged.
+
+- Packaging (full run only; `--quick`/`--no-package` skip it). Each builder is fail-soft - its tool missing just skips that format, like the rest of the pipeline's soft deps.
+	- Built from the Linux dev box now:
+		- `.deb` + `.rpm` per Linux arch, via nfpm (`cicd/packaging/nfpm.yaml`, a template the pipeline renders per arch). goreleaser mirrors the same fields for the hosted release.
+		- Windows: a single self-contained setup `.exe` per arch, via NSIS/makensis (`cicd/packaging/windows-installer.nsi`) - the static binary needs no bundled runtime; the installer puts `rpdc` on PATH and upgrades an existing install in place. The bare `.exe` also ships zipped.
+		- Everything else ships as a `.tar.gz` (zip on Windows) archive + `checksums.txt`.
+	- Deferred (need their own OS or signing - wired as future runner steps, not blockers):
+		- macOS `.dmg` (needs a Mac + an Apple signing cert), FreeBSD `pkg` (needs a FreeBSD builder), Linux AppImage + Flatpak (deferred by decision). `.msi` is deferred in favour of the NSIS `.exe` installer.
 
 - Toolchain pinning: `cicd/tool-versions.env` pins Go and the audit/lint tools in one place, consumed by both the local pipeline and CI. Dependabot (`.github/dependabot.yml`) raises grouped minor/patch bumps against `dev`.
 

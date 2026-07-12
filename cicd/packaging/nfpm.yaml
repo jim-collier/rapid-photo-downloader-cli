@@ -1,0 +1,26 @@
+# nfpm config for the Linux .deb/.rpm packages (backlog: "for each linux build,
+# create .deb + .rpm"). Driven by cicd/cicd.bash; .goreleaser.yaml::nfpms mirrors
+# these same fields for the hosted release. This is a TEMPLATE: the pipeline
+# substitutes the ${...} placeholders per arch (nfpm's own env expansion is not
+# relied on - its globber would eat the ${...}), then runs nfpm on the rendered
+# file. Placeholders:
+#   PKG_VERSION  in-source version (internal/version, no leading v)
+#   PKG_ARCH     go arch: amd64 | arm64  (nfpm translates per packager)
+#   PKG_BIN      repo-relative path to the already-built linux binary for that arch
+name: rpdc
+arch: ${PKG_ARCH}
+version: ${PKG_VERSION}
+maintainer: Jim Collier
+description: |
+  Rapid Photo Downloader CLI - rename and copy or move photos, videos, music,
+  and regular files. The direct file actions of Rapid Photo Downloader Pro in a
+  single static CLI binary.
+homepage: https://github.com/jim-collier/rapid-photo-downloader-cli
+license: GPL-2.0-or-later
+section: utils
+priority: optional
+contents:
+  - src: ${PKG_BIN}
+    dst: /usr/bin/rpdc
+    file_info:
+      mode: 0755
