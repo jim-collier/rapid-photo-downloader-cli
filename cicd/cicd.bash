@@ -397,10 +397,30 @@ fi
 
 ## Stage 7: backup + publish.
 fSection "7/7  Backup + publish"
-## Warn (never abort) if the in-source version wasn't bumped since the last tag -
-## a normal publish is not a release, but flag it so the bump isn't forgotten. The
-## release workflow enforces this strictly. Skips silently until the source lands.
-if [[ -x "${here}/utility/version-check.bash" ]]; then "${here}/utility/version-check.bash" >/dev/null || true; fi
+## Pre-publish gate. On the release branch (a push there cuts a release) it is
+## strict: version must be bumped past the last tag and the README badge must
+## agree, or we abort before publishing. On any other branch the same checks run
+## warn-only. All skip silently until the version source lands. The AI-tell scrub
+## lives outside the tree (../private/hooks); absent -> skipped, never an error.
+cur_branch="$(git -C "${root}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo '')"
+gate_strict=0; [[ -n "$cur_branch" && "$cur_branch" == "${RELEASE_BRANCH:-main}" ]] && gate_strict=1
+gate_flag=(); ((gate_strict)) && gate_flag=(--strict)
+
+scrub="${root}/${PRIVATE_HOOKS_DIR:-../private/hooks}/ai-tell-scrub.bash"
+if [[ -x "$scrub" ]]; then
+	if ! "$scrub" "${root}" >&2; then
+		((gate_strict)) && fDie "AI-tell scrub found giveaways (release branch '${cur_branch}')"
+		fEcho "WARNING: AI-tell scrub found giveaways - scrub before releasing"
+	fi
+fi
+if [[ -x "${here}/utility/version-check.bash" ]]; then
+	"${here}/utility/version-check.bash" "${gate_flag[@]}" >/dev/null \
+		|| fDie "version not bumped for release branch '${cur_branch}' - bump internal/version"
+fi
+if [[ -x "${here}/utility/badge-check.bash" ]]; then
+	"${here}/utility/badge-check.bash" "${gate_flag[@]}" \
+		|| fDie "README badge disagrees with in-source version (release branch '${cur_branch}')"
+fi
 ## Always run the publisher quiet: cicd already gave the initial prompt, so skip
 ## its redundant continue-prompt. With no message it still lets git open the editor.
 pub_flags=(--quiet)

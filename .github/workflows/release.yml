@@ -31,6 +31,8 @@ jobs:
           fi
           # --strict fails the release if the in-source version wasn't bumped.
           ver="$(cicd/utility/version-check.bash --strict)"
+          # ...and if the README badge disagrees with that version.
+          cicd/utility/badge-check.bash --strict
           echo "version=${ver}" >> "$GITHUB_OUTPUT"
           if git rev-parse -q --verify "refs/tags/v${ver}" >/dev/null; then
             echo "release=false" >> "$GITHUB_OUTPUT"

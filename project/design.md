@@ -248,8 +248,12 @@ Definition:
 
 - Versioning: the version lives in Go source and is the single source of truth.
 	- Location/format: `const Version = "X.Y.Z"` in `internal/version/version.go` (kept trivially greppable).
-	- We decided source-of-truth-in-code over a manual pre-merge tag, with a guard: the local pipeline warns, and the release workflow fails, if the in-source version wasn't bumped past the latest tag (`cicd/utility/version-check.bash`).
+	- We decided source-of-truth-in-code over a manual pre-merge tag, with a guard: the in-source version must be bumped past the latest tag (`cicd/utility/version-check.bash`).
 	- `Commit` and `Date` in the same package are `-ldflags -X` stamped at build/release time; `Version` stays a plain const you edit.
+
+- Pre-publish gate (release-branch-aware). A push to the release branch (`main`) is a release cut, so the local pipeline's publish stage turns strict there and aborts on any of: version not bumped, README badge disagreeing with the in-source version (`cicd/utility/badge-check.bash`), or an AI-tell scrub hit. On any other branch the same checks run warn-only. All skip cleanly until the version source lands. The hosted release workflow enforces the version + badge checks independently.
+	- The release badge is shields.io's dynamic "latest release" form, so it tracks the git tag on its own; badge-check just guarantees it points at this repo and that nobody has pinned a stale literal version by hand.
+	- AI-tell scrub lives OUTSIDE the tree, in `../private/hooks/ai-tell-scrub.bash` - a scanner for tells necessarily contains the tells it hunts, and such a script sitting in-repo is itself a giveaway. The gate runs it if present and skips silently if the hook (or its dir) is absent.
 
 - Build matrix: the full run (not `--quick`) builds every os/arch this box can cross-compile - Linux, FreeBSD, Windows, macOS, each x86_64 + arm64. All pure-Go static (CGO off), so a cross-build needs nothing but `GOOS`/`GOARCH`.
 	- No `--include-arm` flag: a cross-compile is codegen only (no emulation), so arm64 costs the same wall-time as amd64, and tests/profiling only ever run the native amd64 build. There is nothing slow to gate.
