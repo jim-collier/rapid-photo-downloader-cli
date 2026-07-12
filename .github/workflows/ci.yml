@@ -1,0 +1,50 @@
+# Hosted safety net only: prove the code vets, builds, and tests off the dev box.
+# The full pipeline (fuzz, profiling, dogfood, publish) stays local in cicd/.
+# Guarded like the local pipeline - a no-op green until go.mod lands, then live.
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Detect Go code
+        id: detect
+        run: |
+          if [[ -f go.mod ]]; then
+            echo "has_go=true" >> "$GITHUB_OUTPUT"
+            echo "go_version=$(grep -E '^GO_VERSION=' cicd/tool-versions.env | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_go=false" >> "$GITHUB_OUTPUT"
+            echo "No go.mod yet - CI is a guarded no-op until code lands."
+          fi
+
+      - uses: actions/setup-go@v6
+        if: steps.detect.outputs.has_go == 'true'
+        with:
+          go-version: ${{ steps.detect.outputs.go_version }}
+
+      - name: vet + build + test
+        if: steps.detect.outputs.has_go == 'true'
+        run: |
+          go vet ./...
+          go build ./...
+          go test ./...
+
+      - name: govulncheck (pinned)
+        if: steps.detect.outputs.has_go == 'true'
+        run: |
+          cicd/utility/install-tools.bash govulncheck
+          "$(go env GOPATH)/bin/govulncheck" ./...

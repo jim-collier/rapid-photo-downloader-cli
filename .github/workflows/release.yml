@@ -1,0 +1,64 @@
+# Release-on-main: a merge to main (from dev) cuts a release. The version is the
+# in-source value (internal/version, see design.md "Versioning"); this tags it
+# vX.Y.Z and lets goreleaser build + publish the GitHub Release with all platform
+# artifacts + checksums. Guarded - a no-op until go.mod + the version source land.
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # goreleaser + the tag check need full history + tags
+
+      - name: Guard + resolve version
+        id: v
+        run: |
+          if [[ ! -f go.mod || ! -f internal/version/version.go ]]; then
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "No code/version source yet - skipping release."
+            exit 0
+          fi
+          # --strict fails the release if the in-source version wasn't bumped.
+          ver="$(cicd/utility/version-check.bash --strict)"
+          echo "version=${ver}" >> "$GITHUB_OUTPUT"
+          if git rev-parse -q --verify "refs/tags/v${ver}" >/dev/null; then
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "Tag v${ver} already exists - nothing to release."
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-go@v6
+        if: steps.v.outputs.release == 'true'
+        with:
+          go-version-file: go.mod
+
+      - name: Tag the release
+        if: steps.v.outputs.release == 'true'
+        run: |
+          git tag "v${{ steps.v.outputs.version }}"
+          git push origin "v${{ steps.v.outputs.version }}"
+
+      - name: Pinned goreleaser version
+        if: steps.v.outputs.release == 'true'
+        id: gr
+        run: echo "v=$(grep -E '^GORELEASER_VERSION=' cicd/tool-versions.env | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+
+      - uses: goreleaser/goreleaser-action@v7
+        if: steps.v.outputs.release == 'true'
+        with:
+          version: ${{ steps.gr.outputs.v }}
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

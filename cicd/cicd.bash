@@ -328,6 +328,10 @@ fi
 
 ## Stage 7: backup + publish.
 fSection "7/7  Backup + publish"
+## Warn (never abort) if the in-source version wasn't bumped since the last tag -
+## a normal publish is not a release, but flag it so the bump isn't forgotten. The
+## release workflow enforces this strictly. Skips silently until the source lands.
+if [[ -x "${here}/utility/version-check.bash" ]]; then "${here}/utility/version-check.bash" >/dev/null || true; fi
 ## Always run the publisher quiet: cicd already gave the initial prompt, so skip
 ## its redundant continue-prompt. With no message it still lets git open the editor.
 pub_flags=(--quiet)

@@ -59,7 +59,9 @@ For the include/exclude flags, use the isolated engine already build and debugge
 		- `--[i][whole]name-inc[lude]="*glob*"`    : Select files to keep by filename or whole filepath, with simple wildcards. Wildcards *must be inside the quotes.*
 		- `--[i][whole]name-exc[lude]="*glob*"`    : Select files to remove by filename or whole filepath.
 		- `--[i][whole]name-re-inc[lude]="*glob*"` : Select files to re-add by filename or whole filepath.
+	- When the final file list is compiled, sort it dedup it.
 - `--files-from[=]"file"`: take the file list from a file instead of `<source/>`. Mutually exclusive with `<source/>` and inc/exc flags.
+	- After loading the list, sort it dedup it.
 
 ##### Duplicates detection and transfer
 
@@ -114,13 +116,13 @@ Also generically useful:
 
 ### Configuration
 
-#### ASHL: "A Simple Hierarchical config Language"
+#### SHCL: "Simple Hierarchical Config Language"
 
 The simplest possible config language that can express any kind of flat or hierarchical data.
 
 CPU cycles are cheap. Brainpower isn't.
 
-ASHL shifts the hard work of using a configuration "language" *away* from:
+SHCL shifts the hard work of using a configuration "language" *away* from:
 
 - The end user.
 - The programmer using the code to read frikkin configuration values.
@@ -237,6 +239,23 @@ Definition:
 - Language: Go. Single static binary, one for each platform; no runtime dependencies *required*.
 	- Although if internal EXIF or video metadata interrogation fails for any given files, the program should try to shell out to ExifTool, if present in the path.
 - Two-phase execution (scan/plan, then act) - counter detection needs whole-batch context, and it buys dry-run/confirm/collision-checks cheaply. See Gotchas.
+
+## Build, versioning, and release
+
+- Branch flow: `dev` is the integration target; feature branches merge to `dev`. `main` is release-only - a merge from `dev` to `main` cuts a release.
+	- The local cicd pipeline (`cicd/`) still owns day-to-day build/test/dogfood/publish, unchanged.
+	- Hosted CI (`.github/workflows/ci.yml`) is a safety net only: vet/build/test on push + PR to both branches, proving it builds off the dev box.
+
+- Versioning: the version lives in Go source and is the single source of truth.
+	- Location/format: `const Version = "X.Y.Z"` in `internal/version/version.go` (kept trivially greppable).
+	- We decided source-of-truth-in-code over a manual pre-merge tag, with a guard: the local pipeline warns, and the release workflow fails, if the in-source version wasn't bumped past the latest tag (`cicd/utility/version-check.bash`).
+	- `Commit` and `Date` in the same package are `-ldflags -X` stamped at build/release time; `Version` stays a plain const you edit.
+
+- Release packaging: goreleaser (`.goreleaser.yaml`), wired into the release workflow.
+	- Same targets/flags as `cicd/config.bash` (pure-Go, CGO off, `-s -w -trimpath`): linux/windows/darwin x amd64/arm64.
+	- Adds archives (`rpdc_<version>_<os>_<arch>`, zip on Windows) + a `checksums.txt` - the local pipeline itself only emits raw binaries, so there is no prior archive scheme to preserve.
+
+- Toolchain pinning: `cicd/tool-versions.env` pins Go and the audit/lint tools in one place, consumed by both the local pipeline and CI. Dependabot (`.github/dependabot.yml`) raises grouped minor/patch bumps against `dev`.
 
 ## Plan
 

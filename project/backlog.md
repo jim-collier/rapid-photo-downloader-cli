@@ -49,7 +49,7 @@ In each section, items are listed approximately from newest to oldest.
 
 - 🔘 Default configuration hard-coded
 	- 🔘 Overridden by per-user config file, created the first time a default setting is changed.
-		- 🔘 Settings live under `~/.config/rpdc/config.ashl`.
+		- 🔘 Settings live under `~/.config/rpdc/config.SHCL`.
 	- 🔘 Overridden by program options at run-time.
 
 ## Backlog
@@ -60,11 +60,26 @@ In each section, items are listed approximately from newest to oldest.
 
 ### Features and enhancements
 
+- 🛠️ CI/CD improvements
+	- Scaffolded 2026-07-11 (branch `ci` -> dev): all five below written + validated, guarded to stay green until `go.mod` + the version source land - same pattern as the local pipeline. End-to-end verification (green CI on real code, real release artifacts) waits for the module.
+	- ✅ Minimal hosted CI
+		- `.github/workflows/ci.yml`: vet/build/test on push + PR to dev and main; guarded no-op until code lands. Adds a pinned govulncheck run.
+	- ✅ Dev branch + release on main
+		- `dev` adopted as the integration target; main is release-only. Feature branches now merge to dev.
+		- `.github/workflows/release.yml`: a merge to main tags `vX.Y.Z` from the in-source version and publishes via goreleaser.
+		- Version source = a `Version` const in `internal/version` (see design.md "Versioning"); local cicd warns and the release workflow fails if it wasn't bumped.
+	- ✅ goreleaser for release packaging
+		- `.goreleaser.yaml` (validated with `goreleaser check`): same targets/flags as `config.bash`, adds archives + checksums. Local build path untouched. (No prior archive scheme existed - local pipeline emits raw binaries.)
+	- ✅ Pin tool versions
+		- `cicd/tool-versions.env` is the single pinned source (Go + govulncheck/gosec/golangci-lint/staticcheck/goreleaser), used by both local (`test.bash`) and CI. `.github/dependabot.yml` bumps deps + actions against dev, minor/patch grouped.
+	- ✅ README badges
+		- CI status + latest release added to the existing badge block.
+
 - 🔘 When listing flags (e.g. for `--help`), figure out a way to simplify the many ways of showing `--[i][whole]name-inc[lude]="*glob*"`, for example. In most cases, users will just do something like `--name-inc="*.IMG"`. But they won't do anything, if they are overwhelmed with complex help. The file selection option documentation, in particular are very dense. (And hard to read.)
 
-- 🔘 Make ASHL its own standalone module for config-file reading, with easy reusability.
+- 🔘 Make SHCL its own standalone module for config-file reading, with easy reusability.
 	- Options:
-		- A monorepo with a ASHL reader/writer in multiple languages and a common test harness...
+		- A monorepo with a SHCL reader/writer in multiple languages and a common test harness...
 		- My own private (or create a public) Go helper repo. As it grows though a version bump in one bumps all - painful.
 		- `go.work`, Go 1.18+. Never used before, seems simple enough. All local. Not managed.
 

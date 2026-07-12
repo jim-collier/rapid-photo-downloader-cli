@@ -1,0 +1,26 @@
+# Dependency + toolchain bumps arrive as PRs against dev (the integration
+# branch). Minor/patch grouped into one PR per ecosystem to keep the noise down;
+# majors come through on their own. gomod stays dormant until go.mod lands.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: "/"
+    target-branch: dev
+    schedule:
+      interval: weekly
+    groups:
+      minor-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    target-branch: dev
+    schedule:
+      interval: weekly
+    groups:
+      minor-patch:
+        update-types:
+          - minor
+          - patch
