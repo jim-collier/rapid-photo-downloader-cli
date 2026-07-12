@@ -240,6 +240,23 @@ Definition:
 	- Although if internal EXIF or video metadata interrogation fails for any given files, the program should try to shell out to ExifTool, if present in the path.
 - Two-phase execution (scan/plan, then act) - counter detection needs whole-batch context, and it buys dry-run/confirm/collision-checks cheaply. See Gotchas.
 
+## Build, versioning, and release
+
+- Branch flow: `dev` is the integration target; feature branches merge to `dev`. `main` is release-only - a merge from `dev` to `main` cuts a release.
+	- The local cicd pipeline (`cicd/`) still owns day-to-day build/test/dogfood/publish, unchanged.
+	- Hosted CI (`.github/workflows/ci.yml`) is a safety net only: vet/build/test on push + PR to both branches, proving it builds off the dev box.
+
+- Versioning: the version lives in Go source and is the single source of truth.
+	- Location/format: `const Version = "X.Y.Z"` in `internal/version/version.go` (kept trivially greppable).
+	- We decided source-of-truth-in-code over a manual pre-merge tag, with a guard: the local pipeline warns, and the release workflow fails, if the in-source version wasn't bumped past the latest tag (`cicd/utility/version-check.bash`).
+	- `Commit` and `Date` in the same package are `-ldflags -X` stamped at build/release time; `Version` stays a plain const you edit.
+
+- Release packaging: goreleaser (`.goreleaser.yaml`), wired into the release workflow.
+	- Same targets/flags as `cicd/config.bash` (pure-Go, CGO off, `-s -w -trimpath`): linux/windows/darwin x amd64/arm64.
+	- Adds archives (`rpdc_<version>_<os>_<arch>`, zip on Windows) + a `checksums.txt` - the local pipeline itself only emits raw binaries, so there is no prior archive scheme to preserve.
+
+- Toolchain pinning: `cicd/tool-versions.env` pins Go and the audit/lint tools in one place, consumed by both the local pipeline and CI. Dependabot (`.github/dependabot.yml`) raises grouped minor/patch bumps against `dev`.
+
 ## Plan
 
 ## Architecture

@@ -30,6 +30,7 @@ set -Eeuo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "${here}/.." && pwd)"
 export PATH="${HOME}/.go/bin:${HOME}/.local/bin:${HOME}/go/bin:${PATH}"
+source "${here}/tool-versions.env"   ## pinned tool versions (same set CI uses)
 cd "${root}"
 
 ## Hold go test / race / vet to <=50% of cores when run standalone; honour cicd.bash's
@@ -85,20 +86,25 @@ else
 	((fuzz_any)) || fEcho_Clean "  (no fuzz targets yet)"
 fi
 
+## Optionally install the pinned security tools first (CI does this). Off by
+## default so a plain local run stays fast and offline; missing tools just skip.
+[[ "${CICD_INSTALL_TOOLS:-0}" == "1" ]] && "${here}/utility/install-tools.bash" govulncheck gosec || true
+
 ## Security: govulncheck covers our code AND the dependency (library) code it pulls
 ## in - the "library code too" requirement. gosec statically scans first-party code.
+## Versions are pinned in tool-versions.env; the install hints echo the exact pin.
 if have govulncheck; then
 	fEcho "govulncheck (our code + dependencies) ..."
 	govulncheck ./...
 else
-	fEcho "WARNING: govulncheck not installed - skipping vuln scan (go install golang.org/x/vuln/cmd/govulncheck@latest)"
+	fEcho "WARNING: govulncheck not installed - skipping vuln scan (go install golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION})"
 fi
 
 if have gosec; then
 	fEcho "gosec (first-party static security) ..."
 	gosec ./...
 else
-	fEcho "WARNING: gosec not installed - skipping static security scan (go install github.com/securego/gosec/v2/cmd/gosec@latest)"
+	fEcho "WARNING: gosec not installed - skipping static security scan (go install github.com/securego/gosec/v2/cmd/gosec@${GOSEC_VERSION})"
 fi
 
 fEcho "OK: all test suites passed"

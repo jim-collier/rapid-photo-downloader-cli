@@ -5,6 +5,8 @@
 <!-- markdownlint-disable MD041 -- First line in a file should be a top-level heading -->
 <div align="center">
 
+[![CI](https://github.com/jim-collier/rapid-photo-downloader-cli/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jim-collier/rapid-photo-downloader-cli/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/jim-collier/rapid-photo-downloader-cli?sort=semver)](https://github.com/jim-collier/rapid-photo-downloader-cli/releases/latest)
 ![Go](https://img.shields.io/badge/Go-00ADD8?logo=go&logoColor=white)
 ![License: GPL v2](https://img.shields.io/badge/License-GPLv2-blue.svg)
 ![Lifecycle: Alpha](https://img.shields.io/badge/Lifecycle-Alpha-orange)

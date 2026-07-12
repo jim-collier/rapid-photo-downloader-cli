@@ -1,0 +1,66 @@
+# goreleaser drives release packaging only (invoked by the release workflow on a
+# merge to main). Day-to-day builds stay on the local pipeline (cicd/) and its
+# native make-equivalent - this file does not touch that path.
+#
+# Targets + flags mirror cicd/config.bash (pure-Go, CGO off, -s -w -trimpath).
+# The local pipeline emits raw binaries; goreleaser adds archives + a checksums
+# file (the packaging the backlog asked for). ldflags assume the module path
+# below - keep it in step with go.mod when the module lands.
+version: 2
+
+project_name: rpdc
+
+builds:
+  - id: rpdc
+    binary: rpdc
+    main: .
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/jim-collier/rapid-photo-downloader-cli/internal/version.Commit={{ .ShortCommit }}
+      - -X github.com/jim-collier/rapid-photo-downloader-cli/internal/version.Date={{ .Date }}
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: rpdc
+    ids:
+      - rpdc
+    # os_arch tokens match cicd/config.bash labels (linux/windows/darwin, amd64/arm64).
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files:
+      - README.md
+      - licence.md
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-dev"
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - Merge branch
+
+release:
+  draft: false
+  prerelease: auto
