@@ -2,9 +2,9 @@
 # merge to main). Day-to-day builds stay on the local pipeline (cicd/) and its
 # native make-equivalent - this file does not touch that path.
 #
-# Targets + flags mirror cicd/config.bash (pure-Go, CGO off, -s -w -trimpath).
-# The local pipeline emits raw binaries; goreleaser adds archives + a checksums
-# file (the packaging the backlog asked for). ldflags assume the module path
+# Targets + flags mirror cicd/config.bash (pure-Go, CGO off, -s -w -trimpath):
+# linux/freebsd/windows/darwin x amd64/arm64. goreleaser adds archives + a
+# checksums file + Linux .deb/.rpm (nfpms below). ldflags assume the module path
 # below - keep it in step with go.mod when the module lands.
 version: 2
 
@@ -24,6 +24,7 @@ builds:
       - -X github.com/jim-collier/rapid-photo-downloader-cli/internal/version.Date={{ .Date }}
     goos:
       - linux
+      - freebsd
       - windows
       - darwin
     goarch:
@@ -45,6 +46,28 @@ archives:
     files:
       - README.md
       - licence.md
+
+# Linux .deb + .rpm - mirrors cicd/packaging/nfpm.yaml (the local pipeline's nfpm
+# config). goreleaser only emits these for the linux builds; freebsd/windows/macos
+# ship as archives above. Windows installer (.exe/NSIS) is built by the local
+# pipeline; .dmg + FreeBSD pkg are deferred to their own OS runners (see design.md).
+nfpms:
+  - id: rpdc
+    package_name: rpdc
+    ids:
+      - rpdc
+    formats:
+      - deb
+      - rpm
+    maintainer: Jim Collier
+    description: |
+      Rapid Photo Downloader CLI - rename and copy or move photos, videos, music,
+      and regular files. The direct file actions of Rapid Photo Downloader Pro in
+      a single static CLI binary.
+    homepage: https://github.com/jim-collier/rapid-photo-downloader-cli
+    license: GPL-2.0-or-later
+    section: utils
+    bindir: /usr/bin
 
 checksum:
   name_template: checksums.txt
