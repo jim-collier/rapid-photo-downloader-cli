@@ -102,6 +102,8 @@ In each section, items are listed approximately from newest to oldest.
 
 #### Done - Features and enhancements
 
+- ✅ Pre-publish gate hardened: strict on the release branch (`main`) - version must be bumped and the README badge must agree, else the publish aborts; warn-only elsewhere. Added `cicd/utility/badge-check.bash`. Any AI-tell scan lives outside the repo (`../private/hooks/ai-tell-scrub.bash`) and is skipped silently when absent.
+
 ### Future and/or deferred
 
 - 🔘 Native installer formats that need their own OS or a signing cert - wire each as a hosted-runner step: macOS `.dmg` (Mac + Apple cert), FreeBSD pkg (FreeBSD builder), Linux AppImage + Flatpak, Windows `.msi`. Config/goreleaser slots + docs already in place; those targets ship as binaries/archives meanwhile.

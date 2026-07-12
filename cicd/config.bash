@@ -145,6 +145,16 @@ DOGFOOD_PREFIX="rpdcdf"
 ## Stage 7: backup + publish to git (runs from repo root).
 GIT_PUBLISH=(cicd/utility/n8git_backup-and-publish)
 
+## Release branch: a push to it is a release cut, so the pre-publish gate turns
+## strict there (version must be bumped, badge must agree). Any other branch is
+## warn-only. Matches the dev-integrates / main-is-release-only flow.
+RELEASE_BRANCH="main"
+
+## Optional external hooks (relative to repo root). Anything that must scan for -
+## and therefore contain - AI tells lives here, OUTSIDE the tree; absent -> the
+## gate skips it silently instead of erroring. See ai-tell-scrub.bash there.
+PRIVATE_HOOKS_DIR="../private/hooks"
+
 ## Set non-empty to publish hands-off (supplies the commit message so `git commit`
 ## won't open an editor). Left empty, publish is interactive unless -m/-q is given.
 PUBLISH_AUTO_MESSAGE=""
